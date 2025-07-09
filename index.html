@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controlador MIDI 4x4</title>
+    <title>Controlador MIDI Avançado</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -105,15 +105,55 @@
             border: 1px solid #f44336;
         }
 
-        .button-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-top: 20px;
+        /* --- Estilos para Abas --- */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #4CAF50;
+        }
+
+        .tab-button {
+            flex-grow: 1;
+            padding: 15px;
+            background: #333;
+            border: none;
+            color: #fff;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background 0.3s, color 0.3s;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            background: #444;
+        }
+
+        .tab-button.active {
+            background: #4CAF50;
+            color: #fff;
+            font-weight: bold;
+            border-bottom: 2px solid #fff;
+        }
+
+        .tab-content {
+            display: none; /* Esconde todas as abas por padrão */
             padding: 20px;
             background: #333;
             border-radius: 10px;
             border: 2px solid #4CAF50;
+        }
+
+        .tab-content.active {
+            display: block; /* Mostra a aba ativa */
+        }
+
+        /* --- Estilos para Grelha de Botões --- */
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
         }
 
         .midi-button {
@@ -160,6 +200,94 @@
             border-color: #444;
         }
 
+        /* --- Estilos para Sliders CC (knobs/faders) --- */
+        .cc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 120px min width for each slider */
+            gap: 20px;
+            padding: 10px;
+        }
+
+        .cc-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #444;
+            padding: 15px 10px;
+            border-radius: 10px;
+            border: 2px solid #555;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .cc-control label {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            color: #4CAF50;
+            text-align: center;
+            font-weight: normal;
+        }
+
+        .cc-control input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #555;
+            border-radius: 5px;
+            outline: none;
+            margin-bottom: 10px;
+        }
+
+        .cc-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 3px solid #333;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+
+        .cc-control input[type="range"]::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 3px solid #333;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+
+        .cc-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #fff;
+            background: #2a2a2a;
+            padding: 5px 10px;
+            border-radius: 5px;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* Desabilitar controles quando não conectados */
+        .cc-control.disabled input[type="range"] {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .cc-control.disabled input[type="range"]::-webkit-slider-thumb {
+            background: #666;
+            border-color: #555;
+        }
+        .cc-control.disabled input[type="range"]::-moz-range-thumb {
+            background: #666;
+            border-color: #555;
+        }
+        .cc-control.disabled .cc-value {
+            color: #999;
+        }
+
+
         .settings {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -189,7 +317,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎹 Controlador MIDI 4x4</h1>
+        <h1>🎹 Controlador MIDI Avançado</h1>
 
         <div class="midi-controls">
             <div class="control-group">
@@ -202,32 +330,42 @@
                     <input type="number" id="midiChannel" min="1" max="16" value="1">
                 </div>
 
-                <div class="control-group">
+                <div class="control-group" id="baseNoteControlGroup">
                     <label for="baseNote">Nota Base:</label>
                     <input type="number" id="baseNote" min="0" max="127" value="60" title="C4 = 60">
                 </div>
 
-                <div class="control-group">
+                <div class="control-group" id="velocityControlGroup">
                     <label for="velocity">Velocidade:</label>
                     <input type="number" id="velocity" min="1" max="127" value="100">
                 </div>
             </div>
 
             <button id="connectBtn" class="connect-btn">Conectar ao Servidor MIDI</button>
-
             <div id="status" class="status disconnected">Aguardando conexão...</div>
         </div>
 
-        <div class="button-grid" id="buttonGrid"></div>
+        <div class="tabs">
+            <button class="tab-button active" data-tab="notes">Notas (4x4)</button>
+            <button class="tab-button" data-tab="ccs">Control Change (CC)</button>
+            </div>
+
+        <div id="notesTab" class="tab-content active">
+            <div class="button-grid" id="buttonGrid"></div>
+        </div>
+
+        <div id="ccsTab" class="tab-content">
+            <div class="cc-grid" id="ccGrid"></div>
+        </div>
 
         <div class="note-display">
-            <h3>Última Nota Enviada</h3>
-            <div id="noteInfo" class="note-info">Nenhuma nota enviada ainda</div>
+            <h3>Última Mensagem Enviada</h3>
+            <div id="lastMessageInfo" class="note-info">Nenhuma mensagem enviada ainda</div>
         </div>
     </div>
     <script>
         let ws = null; // Variável para a conexão WebSocket
-        let activeButtons = new Set();
+        let activeButtons = new Set(); // Para notas (botões pressionados)
 
         // Nomes das notas
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -240,13 +378,25 @@
 
         // Elementos DOM
         const connectBtn = document.getElementById('connectBtn');
-        const websocketUrlInput = document.getElementById('websocketUrl'); // Novo input para URL
+        const websocketUrlInput = document.getElementById('websocketUrl');
         const midiChannelInput = document.getElementById('midiChannel');
         const baseNoteInput = document.getElementById('baseNote');
         const velocityInput = document.getElementById('velocity');
         const statusDiv = document.getElementById('status');
-        const buttonGrid = document.getElementById('buttonGrid');
-        const noteInfo = document.getElementById('noteInfo');
+        const buttonGrid = document.getElementById('buttonGrid'); // Grelha para botões de notas
+        const ccGrid = document.getElementById('ccGrid');         // Grelha para sliders de CC
+        const lastMessageInfo = document.getElementById('lastMessageInfo'); // Renomeado de noteInfo
+
+        const notesTabContent = document.getElementById('notesTab');
+        const ccsTabContent = document.getElementById('ccsTab');
+        const tabButtons = document.querySelectorAll('.tab-button');
+
+        // Controles de notas e velocidade que aparecem/desaparecem com a aba
+        const baseNoteControlGroup = document.getElementById('baseNoteControlGroup');
+        const velocityControlGroup = document.getElementById('velocityControlGroup');
+
+        let currentActiveTab = 'notes'; // Manter controlo da aba ativa
+
 
         // Função para conectar ao servidor WebSocket
         function connectWebSocket() {
@@ -259,7 +409,7 @@
 
             statusDiv.textContent = 'Conectando ao servidor MIDI...';
             statusDiv.className = 'status disconnected';
-            connectBtn.disabled = true; // Desabilita o botão enquanto tenta conectar
+            connectBtn.disabled = true;
 
             ws = new WebSocket(url);
 
@@ -267,7 +417,12 @@
                 console.log('Conectado ao servidor WebSocket.');
                 statusDiv.textContent = 'Conectado ao servidor MIDI!';
                 statusDiv.className = 'status connected';
-                enableButtons();
+                // Ativar apenas os controles da aba atual
+                if (currentActiveTab === 'notes') {
+                    enableButtons();
+                } else if (currentActiveTab === 'ccs') {
+                    enableCcSliders();
+                }
             };
 
             ws.onmessage = (event) => {
@@ -279,19 +434,22 @@
                 console.log('Desconectado do servidor WebSocket.');
                 statusDiv.textContent = 'Desconectado - Verifique o endereço e reconecte.';
                 statusDiv.className = 'status disconnected';
-                connectBtn.disabled = false; // Ativa o botão para reconectar
-                disableButtons();
+                connectBtn.disabled = false;
+                disableButtons(); // Desabilita todos os botões e sliders
+                disableCcSliders();
             };
 
             ws.onerror = (error) => {
                 console.error('Erro no WebSocket:', error);
                 statusDiv.textContent = 'Erro de conexão: Verifique o endereço e se o servidor está ativo.';
                 statusDiv.className = 'status disconnected';
-                connectBtn.disabled = false; // Ativa o botão para tentar novamente
-                disableButtons();
+                connectBtn.disabled = false;
+                disableButtons(); // Desabilita todos os botões e sliders
+                disableCcSliders();
             };
         }
 
+        // --- Funções para Botões de Notas ---
         function enableButtons() {
             const buttons = buttonGrid.querySelectorAll('.midi-button');
             buttons.forEach(button => {
@@ -306,10 +464,8 @@
             });
         }
 
-        // Criar grid de botões
         function createButtonGrid() {
             buttonGrid.innerHTML = '';
-
             for (let i = 0; i < 16; i++) {
                 const button = document.createElement('button');
                 button.className = 'midi-button';
@@ -317,35 +473,13 @@
                 button.dataset.noteIndex = i;
                 button.disabled = true; // Desabilitado por padrão até conectar
 
-                button.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    handleButtonPress(i);
-                });
-
-                button.addEventListener('mouseup', (e) => {
-                    e.preventDefault();
-                    handleButtonRelease(i);
-                });
-
-                button.addEventListener('mouseleave', (e) => {
-                    e.preventDefault();
-                    handleButtonRelease(i);
-                });
-
-                button.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    handleButtonPress(i);
-                });
-
-                button.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    handleButtonRelease(i);
-                });
-
-                button.addEventListener('touchcancel', (e) => {
-                    e.preventDefault();
-                    handleButtonRelease(i);
-                });
+                // Eventos de mouse e toque para Note On/Off
+                button.addEventListener('mousedown', (e) => { e.preventDefault(); handleButtonPress(i); });
+                button.addEventListener('mouseup', (e) => { e.preventDefault(); handleButtonRelease(i); });
+                button.addEventListener('mouseleave', (e) => { e.preventDefault(); handleButtonRelease(i); });
+                button.addEventListener('touchstart', (e) => { e.preventDefault(); handleButtonPress(i); });
+                button.addEventListener('touchend', (e) => { e.preventDefault(); handleButtonRelease(i); });
+                button.addEventListener('touchcancel', (e) => { e.preventDefault(); handleButtonRelease(i); });
 
                 buttonGrid.appendChild(button);
             }
@@ -379,7 +513,6 @@
 
             if (note > 127) return; // MIDI note limit
 
-            // Envia a mensagem MIDI como um objeto JSON via WebSocket
             const message = {
                 type: 'noteOn',
                 channel: channel,
@@ -389,8 +522,7 @@
             ws.send(JSON.stringify(message));
 
             const noteName = getNoteNameFromMIDI(note);
-            noteInfo.textContent = `Note ON: ${noteName} (${note}) - Velocity: ${velocity} - Canal: ${channel + 1}`;
-
+            lastMessageInfo.textContent = `Note ON: ${noteName} (${note}) - Velocidade: ${velocity} - Canal: ${channel + 1}`;
             console.log('Note ON (via WebSocket):', noteName, note, velocity, channel + 1);
         }
 
@@ -401,7 +533,6 @@
 
             if (note > 127) return;
 
-            // Envia a mensagem MIDI como um objeto JSON via WebSocket
             const message = {
                 type: 'noteOff',
                 channel: channel,
@@ -410,13 +541,125 @@
             ws.send(JSON.stringify(message));
 
             const noteName = getNoteNameFromMIDI(note);
-            noteInfo.textContent = `Note OFF: ${noteName} (${note}) - Canal: ${channel + 1}`;
-
+            lastMessageInfo.textContent = `Note OFF: ${noteName} (${note}) - Canal: ${channel + 1}`;
             console.log('Note OFF (via WebSocket):', noteName, note, channel + 1);
         }
 
-        // Event listeners
+        // --- Funções para Sliders CC ---
+        function createCcSliders() {
+            ccGrid.innerHTML = '';
+            for (let i = 0; i < 16; i++) { // 16 sliders para CCs 0-15 (ajustável)
+                const ccControl = document.createElement('div');
+                ccControl.className = 'cc-control disabled'; // Desabilitado por padrão
+                ccControl.dataset.ccNumber = i;
+
+                const label = document.createElement('label');
+                label.textContent = `CC ${i}`;
+                ccControl.appendChild(label);
+
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = '0';
+                slider.max = '127';
+                slider.value = '0'; // Valor inicial
+                slider.disabled = true; // Desabilitado por padrão
+                slider.addEventListener('input', (e) => {
+                    sendControlChange(i, parseInt(e.target.value));
+                    ccValueDisplay.textContent = e.target.value;
+                });
+                ccControl.appendChild(slider);
+
+                const ccValueDisplay = document.createElement('span');
+                ccValueDisplay.className = 'cc-value';
+                ccValueDisplay.textContent = slider.value;
+                ccControl.appendChild(ccValueDisplay);
+
+                ccGrid.appendChild(ccControl);
+            }
+        }
+
+        function enableCcSliders() {
+            const sliders = ccGrid.querySelectorAll('.cc-control');
+            sliders.forEach(control => {
+                control.classList.remove('disabled');
+                control.querySelector('input[type="range"]').disabled = false;
+            });
+        }
+
+        function disableCcSliders() {
+            const sliders = ccGrid.querySelectorAll('.cc-control');
+            sliders.forEach(control => {
+                control.classList.add('disabled');
+                control.querySelector('input[type="range"]').disabled = true;
+            });
+        }
+
+        function sendControlChange(ccNumber, value) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const channel = parseInt(midiChannelInput.value) - 1;
+
+            const message = {
+                type: 'controlChange',
+                channel: channel,
+                controller: ccNumber,
+                value: value
+            };
+            ws.send(JSON.stringify(message));
+
+            lastMessageInfo.textContent = `CC: ${ccNumber} - Valor: ${value} - Canal: ${channel + 1}`;
+            console.log('Control Change (via WebSocket):', ccNumber, value, channel + 1);
+        }
+
+        // --- Funções para Gestão de Abas ---
+        function openTab(tabName) {
+            // Esconder todo o conteúdo das abas e remover classe 'active' dos botões
+            document.querySelectorAll('.tab-content').forEach(tabContent => {
+                tabContent.classList.remove('active');
+            });
+            tabButtons.forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Mostrar a aba selecionada e ativar o botão
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            document.querySelector(`.tab-button[data-tab="${tabName}"]`).classList.add('active');
+
+            currentActiveTab = tabName; // Atualiza a aba ativa
+
+            // Ativar/desativar campos de notas/velocidade
+            if (tabName === 'notes') {
+                baseNoteControlGroup.style.display = 'block';
+                velocityControlGroup.style.display = 'block';
+                if (ws && ws.readyState === WebSocket.OPEN) { // Se já estiver conectado, ativar botões
+                    enableButtons();
+                    disableCcSliders();
+                } else { // Se não estiver conectado, desativar ambos
+                    disableButtons();
+                    disableCcSliders();
+                }
+            } else if (tabName === 'ccs') {
+                baseNoteControlGroup.style.display = 'none';
+                velocityControlGroup.style.display = 'none';
+                if (ws && ws.readyState === WebSocket.OPEN) { // Se já estiver conectado, ativar sliders
+                    enableCcSliders();
+                    disableButtons();
+                } else { // Se não estiver conectado, desativar ambos
+                    disableButtons();
+                    disableCcSliders();
+                }
+            }
+        }
+
+
+        // --- Event Listeners ---
         connectBtn.addEventListener('click', connectWebSocket);
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                openTab(button.dataset.tab);
+            });
+        });
 
         // Prevenir context menu nos botões
         document.addEventListener('contextmenu', (e) => {
@@ -432,15 +675,13 @@
             }
         });
 
-        // Inicializar interface
-        createButtonGrid();
-
-        // --- Alteração principal aqui ---
-        // Ativar o botão de conexão e definir o status inicial correto
+        // --- Inicialização ---
+        createButtonGrid(); // Cria os botões de notas
+        createCcSliders();  // Cria os sliders de CCs
+        openTab('notes');   // Abre a aba de Notas por padrão ao carregar
         connectBtn.disabled = false;
         statusDiv.textContent = 'Aguardando conexão...';
         statusDiv.className = 'status disconnected';
-        // --- Fim da alteração principal ---
 
     </script>
 </body>
