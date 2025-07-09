@@ -193,12 +193,10 @@
         
         <div class="midi-controls">
             <div class="control-group">
-                <label for="midiOutputSelect">Porta MIDI de Saída:</label>
-                <select id="midiOutputSelect">
-                    <option value="">Selecione uma porta MIDI...</option>
-                </select>
+                <label for="websocketUrl">Endereço do Servidor MIDI (Ex: ws://192.168.1.100:8080):</label>
+                <input type="text" id="websocketUrl" value="ws://localhost:8080" placeholder="ws://IP_DO_SEU_PC:PORTA">
             </div>
-            
+
             <div class="settings">
                 <div class="control-group">
                     <label for="midiChannel">Canal MIDI (1-16):</label>
@@ -216,16 +214,15 @@
                 </div>
             </div>
             
-            <button id="connectBtn" class="connect-btn">Conectar MIDI</button>
+            <button id="connectBtn" class="connect-btn">Conectar ao Servidor MIDI</button>
             
             <div id="status" class="status disconnected">
-                Desconectado - Clique em "Conectar MIDI" para começar
+                Desconectado - Insira o endereço e clique em "Conectar"
             </div>
         </div>
         
         <div class="button-grid" id="buttonGrid">
-            <!-- Botões serão gerados dinamicamente -->
-        </div>
+            </div>
         
         <div class="note-display">
             <h3>Última Nota Enviada</h3>
@@ -234,8 +231,7 @@
     </div>
 
     <script>
-        let midiAccess = null;
-        let selectedOutput = null;
+        let ws = null; // Variável para a conexão WebSocket
         let activeButtons = new Set();
         
         // Nomes das notas
@@ -249,7 +245,7 @@
         
         // Elementos DOM
         const connectBtn = document.getElementById('connectBtn');
-        const midiOutputSelect = document.getElementById('midiOutputSelect');
+        const websocketUrlInput = document.getElementById('websocketUrl'); // Novo input para URL
         const midiChannelInput = document.getElementById('midiChannel');
         const baseNoteInput = document.getElementById('baseNote');
         const velocityInput = document.getElementById('velocity');
@@ -257,55 +253,62 @@
         const buttonGrid = document.getElementById('buttonGrid');
         const noteInfo = document.getElementById('noteInfo');
         
-        // Inicialização
-        async function initMIDI() {
-            try {
-                statusDiv.textContent = 'Conectando ao MIDI...';
+        // Função para conectar ao servidor WebSocket
+        function connectWebSocket() {
+            const url = websocketUrlInput.value;
+            if (!url) {
+                statusDiv.textContent = 'Erro: Insira o endereço do servidor MIDI.';
                 statusDiv.className = 'status disconnected';
-                
-                midiAccess = await navigator.requestMIDIAccess();
-                
-                updateOutputList();
-                updateStatus();
-                
-                // Escutar mudanças nas portas MIDI
-                midiAccess.onstatechange = () => {
-                    updateOutputList();
-                    updateStatus();
-                };
-                
-                statusDiv.textContent = 'MIDI conectado! Selecione uma porta de saída.';
+                return;
+            }
+
+            statusDiv.textContent = 'Conectando ao servidor MIDI...';
+            statusDiv.className = 'status disconnected';
+            connectBtn.disabled = true;
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                console.log('Conectado ao servidor WebSocket.');
+                statusDiv.textContent = 'Conectado ao servidor MIDI!';
                 statusDiv.className = 'status connected';
-                
-            } catch (error) {
-                console.error('Erro ao conectar MIDI:', error);
-                statusDiv.textContent = 'Erro: ' + error.message;
+                enableButtons();
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Mensagem do servidor:', event.data);
+                // Opcional: Processar feedback do servidor se necessário
+            };
+
+            ws.onclose = () => {
+                console.log('Desconectado do servidor WebSocket.');
+                statusDiv.textContent = 'Desconectado - Verifique o endereço e reconecte.';
                 statusDiv.className = 'status disconnected';
-            }
+                connectBtn.disabled = false;
+                disableButtons();
+            };
+
+            ws.onerror = (error) => {
+                console.error('Erro no WebSocket:', error);
+                statusDiv.textContent = 'Erro de conexão: Verifique o endereço e se o servidor está ativo.';
+                statusDiv.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disableButtons();
+            };
         }
-        
-        function updateOutputList() {
-            const outputSelect = midiOutputSelect;
-            outputSelect.innerHTML = '<option value="">Selecione uma porta MIDI...</option>';
-            
-            if (midiAccess) {
-                for (let output of midiAccess.outputs.values()) {
-                    const option = document.createElement('option');
-                    option.value = output.id;
-                    option.textContent = output.name || `Porto ${output.id}`;
-                    outputSelect.appendChild(option);
-                }
-            }
+
+        function enableButtons() {
+            const buttons = buttonGrid.querySelectorAll('.midi-button');
+            buttons.forEach(button => {
+                button.disabled = false;
+            });
         }
-        
-        function updateStatus() {
-            if (selectedOutput && selectedOutput.state === 'connected') {
-                statusDiv.textContent = `Conectado a: ${selectedOutput.name}`;
-                statusDiv.className = 'status connected';
-            } else if (midiAccess) {
-                statusDiv.textContent = 'MIDI conectado! Selecione uma porta de saída.';
-                statusDiv.className = 'status connected';
-            }
+
+        function disableButtons() {
+            const buttons = buttonGrid.querySelectorAll('.midi-button');
+            buttons.forEach(button => {
+                button.disabled = true;
+            });
         }
         
         // Criar grid de botões
@@ -317,9 +320,8 @@
                 button.className = 'midi-button';
                 button.textContent = i + 1;
                 button.dataset.noteIndex = i;
-                button.disabled = true;
-                
-                // Eventos para desktop
+                button.disabled = true; // Desabilitado por padrão até conectar
+
                 button.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     handleButtonPress(i);
@@ -335,7 +337,6 @@
                     handleButtonRelease(i);
                 });
                 
-                // Eventos para mobile
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     handleButtonPress(i);
@@ -356,7 +357,7 @@
         }
         
         function handleButtonPress(buttonIndex) {
-            if (!selectedOutput || activeButtons.has(buttonIndex)) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN || activeButtons.has(buttonIndex)) return;
             
             activeButtons.add(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
@@ -366,7 +367,7 @@
         }
         
         function handleButtonRelease(buttonIndex) {
-            if (!selectedOutput || !activeButtons.has(buttonIndex)) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN || !activeButtons.has(buttonIndex)) return;
             
             activeButtons.delete(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
@@ -383,13 +384,19 @@
             
             if (note > 127) return; // MIDI note limit
             
-            const noteOnMessage = [0x90 | channel, note, velocity];
-            selectedOutput.send(noteOnMessage);
+            // Envia a mensagem MIDI como um objeto JSON via WebSocket
+            const message = {
+                type: 'noteOn',
+                channel: channel,
+                note: note,
+                velocity: velocity
+            };
+            ws.send(JSON.stringify(message));
             
             const noteName = getNoteNameFromMIDI(note);
             noteInfo.textContent = `Note ON: ${noteName} (${note}) - Velocity: ${velocity} - Canal: ${channel + 1}`;
             
-            console.log('Note ON:', noteName, note, velocity, channel + 1);
+            console.log('Note ON (via WebSocket):', noteName, note, velocity, channel + 1);
         }
         
         function sendNoteOff(buttonIndex) {
@@ -399,40 +406,26 @@
             
             if (note > 127) return;
             
-            const noteOffMessage = [0x80 | channel, note, 0];
-            selectedOutput.send(noteOffMessage);
+            // Envia a mensagem MIDI como um objeto JSON via WebSocket
+            const message = {
+                type: 'noteOff',
+                channel: channel,
+                note: note
+            };
+            ws.send(JSON.stringify(message));
             
             const noteName = getNoteNameFromMIDI(note);
             noteInfo.textContent = `Note OFF: ${noteName} (${note}) - Canal: ${channel + 1}`;
             
-            console.log('Note OFF:', noteName, note, channel + 1);
+            console.log('Note OFF (via WebSocket):', noteName, note, channel + 1);
         }
         
         // Event listeners
-        connectBtn.addEventListener('click', initMIDI);
+        connectBtn.addEventListener('click', connectWebSocket);
         
-        midiOutputSelect.addEventListener('change', (e) => {
-            const outputId = e.target.value;
-            if (outputId && midiAccess) {
-                selectedOutput = midiAccess.outputs.get(outputId);
-                updateStatus();
-                
-                // Habilitar botões
-                const buttons = buttonGrid.querySelectorAll('.midi-button');
-                buttons.forEach(button => {
-                    button.disabled = false;
-                });
-            } else {
-                selectedOutput = null;
-                
-                // Desabilitar botões
-                const buttons = buttonGrid.querySelectorAll('.midi-button');
-                buttons.forEach(button => {
-                    button.disabled = true;
-                });
-            }
-        });
-        
+        // Remove os event listeners antigos relacionados à Web MIDI API
+        // midiOutputSelect.addEventListener('change', ...); // Esta parte não é mais necessária
+
         // Prevenir context menu nos botões
         document.addEventListener('contextmenu', (e) => {
             if (e.target.classList.contains('midi-button')) {
@@ -450,12 +443,8 @@
         // Inicializar interface
         createButtonGrid();
         
-        // Verificar suporte MIDI
-        if (!navigator.requestMIDIAccess) {
-            statusDiv.textContent = 'Web MIDI API não suportada neste navegador';
-            statusDiv.className = 'status disconnected';
-            connectBtn.disabled = true;
-        }
+        // Não precisamos mais verificar navigator.requestMIDIAccess
+        // A mensagem inicial de status é definida pelo HTML/CSS
     </script>
 </body>
 </html>
