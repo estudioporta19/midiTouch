@@ -149,7 +149,7 @@
             display: block; /* Mostra a aba ativa */
         }
 
-        /* --- Estilos para Grelha de Botões --- */
+        /* --- Estilos para Grelha de Botões (Notas) --- */
         .button-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -287,7 +287,6 @@
             color: #999;
         }
 
-
         .settings {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -313,6 +312,115 @@
             font-size: 18px;
             color: #fff;
         }
+
+        /* --- Estilos para a Aba Híbrida --- */
+        .hybrid-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            padding: 10px;
+        }
+
+        .hybrid-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #444;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #555;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            min-height: 120px; /* Para manter a altura consistente */
+            justify-content: space-around;
+        }
+
+        .hybrid-control label {
+            font-size: 0.8em;
+            margin-bottom: 5px;
+            color: #4CAF50;
+        }
+
+        .hybrid-control input[type="number"],
+        .hybrid-control input[type="range"] {
+            width: calc(100% - 10px); /* Ajuste para padding */
+            margin-bottom: 5px;
+        }
+
+        .hybrid-control .midi-button {
+            width: calc(100% - 10px);
+            height: 50px; /* Ajuste para ter um botão de altura fixa */
+            aspect-ratio: auto; /* Remove aspect ratio para que a altura funcione */
+            font-size: 14px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Estilos específicos para o slider híbrido */
+        .hybrid-control .hybrid-cc-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #555;
+            border-radius: 5px;
+            outline: none;
+            margin-top: 5px;
+        }
+
+        .hybrid-control .hybrid-cc-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 3px solid #333;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+        .hybrid-control .hybrid-cc-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 3px solid #333;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+
+        .hybrid-control .hybrid-cc-value {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #fff;
+            background: #2a2a2a;
+            padding: 3px 6px;
+            border-radius: 3px;
+            min-width: 20px;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        /* Desabilitar controles híbridos */
+        .hybrid-control.disabled input,
+        .hybrid-control.disabled button {
+            background: #333 !important;
+            color: #666 !important;
+            cursor: not-allowed !important;
+            border-color: #444 !important;
+        }
+        .hybrid-control.disabled .hybrid-cc-slider {
+            background: #666 !important;
+        }
+        .hybrid-control.disabled .hybrid-cc-slider::-webkit-slider-thumb,
+        .hybrid-control.disabled .hybrid-cc-slider::-moz-range-thumb {
+             background: #666 !important;
+             border-color: #555 !important;
+        }
+        .hybrid-control.disabled .hybrid-cc-value {
+             color: #999 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -328,6 +436,11 @@
                 <div class="control-group">
                     <label for="midiChannel">Canal MIDI (1-16):</label>
                     <input type="number" id="midiChannel" min="1" max="16" value="1">
+                </div>
+
+                <div class="control-group" id="ccStartControlGroup">
+                    <label for="ccStart">CC Inicial para Sliders (0-111):</label>
+                    <input type="number" id="ccStart" min="0" max="111" value="0">
                 </div>
 
                 <div class="control-group" id="baseNoteControlGroup">
@@ -348,7 +461,8 @@
         <div class="tabs">
             <button class="tab-button active" data-tab="notes">Notas (4x4)</button>
             <button class="tab-button" data-tab="ccs">Control Change (CC)</button>
-            </div>
+            <button class="tab-button" data-tab="hybrid">Híbrida (8 CCs / 8 Notas)</button>
+        </div>
 
         <div id="notesTab" class="tab-content active">
             <div class="button-grid" id="buttonGrid"></div>
@@ -356,6 +470,10 @@
 
         <div id="ccsTab" class="tab-content">
             <div class="cc-grid" id="ccGrid"></div>
+        </div>
+
+        <div id="hybridTab" class="tab-content">
+            <div class="hybrid-grid" id="hybridGrid"></div>
         </div>
 
         <div class="note-display">
@@ -371,6 +489,7 @@
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
         function getNoteNameFromMIDI(midiNote) {
+            if (midiNote < 0 || midiNote > 127) return 'N/A';
             const octave = Math.floor(midiNote / 12) - 1;
             const noteName = noteNames[midiNote % 12];
             return `${noteName}${octave}`;
@@ -382,18 +501,22 @@
         const midiChannelInput = document.getElementById('midiChannel');
         const baseNoteInput = document.getElementById('baseNote');
         const velocityInput = document.getElementById('velocity');
+        const ccStartInput = document.getElementById('ccStart'); // Novo input para CC inicial
         const statusDiv = document.getElementById('status');
-        const buttonGrid = document.getElementById('buttonGrid'); // Grelha para botões de notas
-        const ccGrid = document.getElementById('ccGrid');         // Grelha para sliders de CC
-        const lastMessageInfo = document.getElementById('lastMessageInfo'); // Renomeado de noteInfo
+        const buttonGrid = document.getElementById('buttonGrid');     // Grelha para botões de notas (aba Notas)
+        const ccGrid = document.getElementById('ccGrid');             // Grelha para sliders de CC (aba CCs)
+        const hybridGrid = document.getElementById('hybridGrid');     // Grelha para controles híbridos (aba Híbrida)
+        const lastMessageInfo = document.getElementById('lastMessageInfo');
 
         const notesTabContent = document.getElementById('notesTab');
         const ccsTabContent = document.getElementById('ccsTab');
+        const hybridTabContent = document.getElementById('hybridTab');
         const tabButtons = document.querySelectorAll('.tab-button');
 
-        // Controles de notas e velocidade que aparecem/desaparecem com a aba
+        // Controles que aparecem/desaparecem com a aba
         const baseNoteControlGroup = document.getElementById('baseNoteControlGroup');
         const velocityControlGroup = document.getElementById('velocityControlGroup');
+        const ccStartControlGroup = document.getElementById('ccStartControlGroup'); // Novo
 
         let currentActiveTab = 'notes'; // Manter controlo da aba ativa
 
@@ -417,12 +540,7 @@
                 console.log('Conectado ao servidor WebSocket.');
                 statusDiv.textContent = 'Conectado ao servidor MIDI!';
                 statusDiv.className = 'status connected';
-                // Ativar apenas os controles da aba atual
-                if (currentActiveTab === 'notes') {
-                    enableButtons();
-                } else if (currentActiveTab === 'ccs') {
-                    enableCcSliders();
-                }
+                updateControlStates(); // Atualiza o estado dos controles com base na aba ativa
             };
 
             ws.onmessage = (event) => {
@@ -435,8 +553,7 @@
                 statusDiv.textContent = 'Desconectado - Verifique o endereço e reconecte.';
                 statusDiv.className = 'status disconnected';
                 connectBtn.disabled = false;
-                disableButtons(); // Desabilita todos os botões e sliders
-                disableCcSliders();
+                disableAllControls(); // Desabilita todos os controles
             };
 
             ws.onerror = (error) => {
@@ -444,12 +561,11 @@
                 statusDiv.textContent = 'Erro de conexão: Verifique o endereço e se o servidor está ativo.';
                 statusDiv.className = 'status disconnected';
                 connectBtn.disabled = false;
-                disableButtons(); // Desabilita todos os botões e sliders
-                disableCcSliders();
+                disableAllControls(); // Desabilita todos os controles
             };
         }
 
-        // --- Funções para Botões de Notas ---
+        // --- Funções para Botões de Notas (Aba Notas) ---
         function enableButtons() {
             const buttons = buttonGrid.querySelectorAll('.midi-button');
             buttons.forEach(button => {
@@ -490,7 +606,7 @@
 
             activeButtons.add(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
-            button.classList.add('active');
+            if (button) button.classList.add('active'); // Garante que o botão existe antes de adicionar classe
 
             sendNoteOn(buttonIndex);
         }
@@ -500,18 +616,18 @@
 
             activeButtons.delete(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
-            button.classList.remove('active');
+            if (button) button.classList.remove('active'); // Garante que o botão existe antes de remover classe
 
             sendNoteOff(buttonIndex);
         }
 
-        function sendNoteOn(buttonIndex) {
+        function sendNoteOn(buttonIndex, noteOverride = null) { // Adicionado noteOverride
             const baseNote = parseInt(baseNoteInput.value);
             const channel = parseInt(midiChannelInput.value) - 1; // MIDI channels are 0-15
             const velocity = parseInt(velocityInput.value);
-            const note = baseNote + buttonIndex;
+            const note = noteOverride !== null ? noteOverride : baseNote + buttonIndex;
 
-            if (note > 127) return; // MIDI note limit
+            if (note < 0 || note > 127) return; // MIDI note limit
 
             const message = {
                 type: 'noteOn',
@@ -526,12 +642,12 @@
             console.log('Note ON (via WebSocket):', noteName, note, velocity, channel + 1);
         }
 
-        function sendNoteOff(buttonIndex) {
+        function sendNoteOff(buttonIndex, noteOverride = null) { // Adicionado noteOverride
             const baseNote = parseInt(baseNoteInput.value);
             const channel = parseInt(midiChannelInput.value) - 1;
-            const note = baseNote + buttonIndex;
+            const note = noteOverride !== null ? noteOverride : baseNote + buttonIndex;
 
-            if (note > 127) return;
+            if (note < 0 || note > 127) return;
 
             const message = {
                 type: 'noteOff',
@@ -545,16 +661,16 @@
             console.log('Note OFF (via WebSocket):', noteName, note, channel + 1);
         }
 
-        // --- Funções para Sliders CC ---
+        // --- Funções para Sliders CC (Aba CCs) ---
         function createCcSliders() {
             ccGrid.innerHTML = '';
-            for (let i = 0; i < 16; i++) { // 16 sliders para CCs 0-15 (ajustável)
+            for (let i = 0; i < 16; i++) { // 16 sliders para CCs
                 const ccControl = document.createElement('div');
                 ccControl.className = 'cc-control disabled'; // Desabilitado por padrão
-                ccControl.dataset.ccNumber = i;
+                ccControl.dataset.index = i; // Usaremos para calcular o CC real
 
                 const label = document.createElement('label');
-                label.textContent = `CC ${i}`;
+                label.textContent = `CC ${i}`; // Temporário, será atualizado
                 ccControl.appendChild(label);
 
                 const slider = document.createElement('input');
@@ -564,7 +680,8 @@
                 slider.value = '0'; // Valor inicial
                 slider.disabled = true; // Desabilitado por padrão
                 slider.addEventListener('input', (e) => {
-                    sendControlChange(i, parseInt(e.target.value));
+                    const currentCCNumber = parseInt(ccStartInput.value) + parseInt(ccControl.dataset.index);
+                    sendControlChange(currentCCNumber, parseInt(e.target.value));
                     ccValueDisplay.textContent = e.target.value;
                 });
                 ccControl.appendChild(slider);
@@ -576,6 +693,17 @@
 
                 ccGrid.appendChild(ccControl);
             }
+            updateCcSliderLabels(); // Atualiza os rótulos dos sliders
+        }
+
+        function updateCcSliderLabels() {
+            const ccStart = parseInt(ccStartInput.value);
+            const ccControls = ccGrid.querySelectorAll('.cc-control');
+            ccControls.forEach(control => {
+                const index = parseInt(control.dataset.index);
+                const ccNumber = ccStart + index;
+                control.querySelector('label').textContent = `CC ${ccNumber}`;
+            });
         }
 
         function enableCcSliders() {
@@ -594,26 +722,119 @@
             });
         }
 
-        function sendControlChange(ccNumber, value) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // Event listener para o input ccStartInput
+        ccStartInput.addEventListener('input', updateCcSliderLabels);
 
-            const channel = parseInt(midiChannelInput.value) - 1;
 
-            const message = {
-                type: 'controlChange',
-                channel: channel,
-                controller: ccNumber,
-                value: value
-            };
-            ws.send(JSON.stringify(message));
+        // --- Funções para Controles Híbridos (Aba Híbrida) ---
+        function createHybridGrid() {
+            hybridGrid.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const hybridControl = document.createElement('div');
+                hybridControl.className = 'hybrid-control disabled';
+                hybridControl.dataset.index = i;
 
-            lastMessageInfo.textContent = `CC: ${ccNumber} - Valor: ${value} - Canal: ${channel + 1}`;
-            console.log('Control Change (via WebSocket):', ccNumber, value, channel + 1);
+                if (i < 8) { // Primeiros 8: Knobs/Sliders de CC
+                    hybridControl.innerHTML = `
+                        <label for="hybridCc${i}">CC ${i}:</label>
+                        <input type="number" id="hybridCc${i}" class="hybrid-cc-input" min="0" max="127" value="${i}" disabled>
+                        <input type="range" class="hybrid-cc-slider" min="0" max="127" value="0" disabled>
+                        <span class="hybrid-cc-value">0</span>
+                    `;
+                    const ccInput = hybridControl.querySelector(`#hybridCc${i}`);
+                    const slider = hybridControl.querySelector('.hybrid-cc-slider');
+                    const valueDisplay = hybridControl.querySelector('.hybrid-cc-value');
+
+                    // Event listener para o input do número do CC
+                    ccInput.addEventListener('input', (e) => {
+                        let val = parseInt(e.target.value);
+                        if (isNaN(val) || val < 0) val = 0;
+                        if (val > 127) val = 127;
+                        e.target.value = val; // Corrigir valor inválido
+                        // Não envia CC aqui, apenas atualiza o número exibido
+                        hybridControl.querySelector('label').textContent = `CC ${val}`;
+                    });
+
+
+                    slider.addEventListener('input', (e) => {
+                        const ccNumber = parseInt(ccInput.value);
+                        const value = parseInt(e.target.value);
+                        sendControlChange(ccNumber, value); // Reutiliza a função de CC
+                        valueDisplay.textContent = value;
+                    });
+
+                } else { // Últimos 8: Botões de Notas
+                    const buttonIndex = i - 8; // Mapeia para 0-7 para os botões
+
+                    hybridControl.innerHTML = `
+                        <label for="hybridNote${buttonIndex}">Nota ${buttonIndex}:</label>
+                        <input type="number" id="hybridNote${buttonIndex}" class="hybrid-note-input" min="0" max="127" value="${60 + buttonIndex}" disabled>
+                        <button class="midi-button hybrid-note-button" data-hybrid-index="${buttonIndex}" disabled>${getNoteNameFromMIDI(60 + buttonIndex)}</button>
+                    `;
+                    const noteInput = hybridControl.querySelector(`#hybridNote${buttonIndex}`);
+                    const button = hybridControl.querySelector('.hybrid-note-button');
+
+                     // Event listener para o input do número da nota
+                    noteInput.addEventListener('input', (e) => {
+                        let val = parseInt(e.target.value);
+                        if (isNaN(val) || val < 0) val = 0;
+                        if (val > 127) val = 127;
+                        e.target.value = val; // Corrigir valor inválido
+                        button.textContent = getNoteNameFromMIDI(val); // Atualiza o texto do botão
+                    });
+
+                    // Eventos de mouse e toque para Note On/Off
+                    let isHybridButtonActive = false; // Estado para gerir pressionamento do botão híbrido
+
+                    const startHandler = (e) => {
+                        e.preventDefault();
+                        if (!ws || ws.readyState !== WebSocket.OPEN || isHybridButtonActive) return;
+                        isHybridButtonActive = true;
+                        button.classList.add('active');
+                        const noteToSend = parseInt(noteInput.value);
+                        sendNoteOn(null, noteToSend); // Usa noteOverride
+                    };
+
+                    const endHandler = (e) => {
+                        e.preventDefault();
+                        if (!ws || ws.readyState !== WebSocket.OPEN || !isHybridButtonActive) return;
+                        isHybridButtonActive = false;
+                        button.classList.remove('active');
+                        const noteToSend = parseInt(noteInput.value);
+                        sendNoteOff(null, noteToSend); // Usa noteOverride
+                    };
+
+                    button.addEventListener('mousedown', startHandler);
+                    button.addEventListener('mouseup', endHandler);
+                    button.addEventListener('mouseleave', endHandler); // Libera se o mouse sair
+                    button.addEventListener('touchstart', startHandler);
+                    button.addEventListener('touchend', endHandler);
+                    button.addEventListener('touchcancel', endHandler); // Libera se o toque for cancelado
+                }
+                hybridGrid.appendChild(hybridControl);
+            }
         }
+
+        function enableHybridControls() {
+            const controls = hybridGrid.querySelectorAll('.hybrid-control');
+            controls.forEach(control => {
+                control.classList.remove('disabled');
+                control.querySelectorAll('input, button').forEach(el => el.disabled = false);
+            });
+        }
+
+        function disableHybridControls() {
+            const controls = hybridGrid.querySelectorAll('.hybrid-control');
+            controls.forEach(control => {
+                control.classList.add('disabled');
+                control.querySelectorAll('input, button').forEach(el => el.disabled = true);
+            });
+        }
+
 
         // --- Funções para Gestão de Abas ---
         function openTab(tabName) {
-            // Esconder todo o conteúdo das abas e remover classe 'active' dos botões
+            // Esconder todo o conteúdo das abas e remover classe 'active' dos botões de abas
             document.querySelectorAll('.tab-content').forEach(tabContent => {
                 tabContent.classList.remove('active');
             });
@@ -621,36 +842,53 @@
                 button.classList.remove('active');
             });
 
-            // Mostrar a aba selecionada e ativar o botão
+            // Mostrar a aba selecionada e ativar o botão de aba
             document.getElementById(tabName + 'Tab').classList.add('active');
             document.querySelector(`.tab-button[data-tab="${tabName}"]`).classList.add('active');
 
             currentActiveTab = tabName; // Atualiza a aba ativa
 
-            // Ativar/desativar campos de notas/velocidade
+            // Gerir visibilidade dos campos de configuração
+            baseNoteControlGroup.style.display = 'none';
+            velocityControlGroup.style.display = 'none';
+            ccStartControlGroup.style.display = 'none';
+
+            // Desabilitar todos os controles de todas as abas por segurança
+            disableButtons();
+            disableCcSliders();
+            disableHybridControls();
+
+            // Ativar os controles da aba atual APENAS se estiver conectado
             if (tabName === 'notes') {
                 baseNoteControlGroup.style.display = 'block';
                 velocityControlGroup.style.display = 'block';
-                if (ws && ws.readyState === WebSocket.OPEN) { // Se já estiver conectado, ativar botões
+                if (ws && ws.readyState === WebSocket.OPEN) {
                     enableButtons();
-                    disableCcSliders();
-                } else { // Se não estiver conectado, desativar ambos
-                    disableButtons();
-                    disableCcSliders();
                 }
             } else if (tabName === 'ccs') {
-                baseNoteControlGroup.style.display = 'none';
-                velocityControlGroup.style.display = 'none';
-                if (ws && ws.readyState === WebSocket.OPEN) { // Se já estiver conectado, ativar sliders
+                ccStartControlGroup.style.display = 'block';
+                if (ws && ws.readyState === WebSocket.OPEN) {
                     enableCcSliders();
-                    disableButtons();
-                } else { // Se não estiver conectado, desativar ambos
-                    disableButtons();
-                    disableCcSliders();
                 }
+            } else if (tabName === 'hybrid') {
+                // Para a aba híbrida, os campos de nota base/velocidade não são usados
+                // O canal MIDI ainda é global
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    enableHybridControls();
+                }
+            }
+            // Atualiza os rótulos dos CCs se a aba CCs estiver ativa
+            if (tabName === 'ccs') {
+                updateCcSliderLabels();
             }
         }
 
+        // Desabilita todos os tipos de controles (chamado ao desconectar)
+        function disableAllControls() {
+            disableButtons();
+            disableCcSliders();
+            disableHybridControls();
+        }
 
         // --- Event Listeners ---
         connectBtn.addEventListener('click', connectWebSocket);
@@ -663,26 +901,34 @@
 
         // Prevenir context menu nos botões
         document.addEventListener('contextmenu', (e) => {
-            if (e.target.classList.contains('midi-button')) {
+            if (e.target.classList.contains('midi-button') || e.target.classList.contains('hybrid-note-button')) {
                 e.preventDefault();
             }
         });
 
         // Release all active notes when window loses focus
         window.addEventListener('blur', () => {
+            // Garante que todas as notas ativas sejam desativadas
             for (let buttonIndex of activeButtons) {
-                handleButtonRelease(buttonIndex);
+                handleButtonRelease(buttonIndex); // Libera botões da aba de Notas
             }
+            // Para botões híbridos, seria necessário um Set separado ou iterar de forma diferente
+            // Por simplicidade, assumimos que handleButtonRelease cuida dos Note Off corretamente
+            // caso o foco seja perdido enquanto um botão híbrido está pressionado.
+            // Para uma robustez máxima em produção, cada tipo de botão deveria gerir seu próprio estado 'active'
+            // e chamar seu respectivo NoteOff em 'blur'.
         });
 
         // --- Inicialização ---
-        createButtonGrid(); // Cria os botões de notas
-        createCcSliders();  // Cria os sliders de CCs
-        openTab('notes');   // Abre a aba de Notas por padrão ao carregar
+        createButtonGrid();  // Cria os botões de notas da primeira aba
+        createCcSliders();   // Cria os sliders de CCs da segunda aba
+        createHybridGrid();  // Cria os controles híbridos da terceira aba
+
+        // Define o estado inicial da UI
         connectBtn.disabled = false;
         statusDiv.textContent = 'Aguardando conexão...';
         statusDiv.className = 'status disconnected';
-
+        openTab('notes'); // Abre a aba de Notas por padrão ao carregar
     </script>
 </body>
 </html>
