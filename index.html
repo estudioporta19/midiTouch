@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controlador MIDI 4x4</title>
     <style>
@@ -13,14 +13,14 @@
             background: #1a1a1a;
             color: #fff;
         }
-        
+
         .container {
             background: #2a2a2a;
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        
+
         h1 {
             text-align: center;
             color: #4CAF50;
@@ -28,7 +28,7 @@
             font-size: 2.5em;
             text-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
         }
-        
+
         .midi-controls {
             margin-bottom: 30px;
             padding: 20px;
@@ -36,18 +36,18 @@
             border-radius: 10px;
             border: 2px solid #4CAF50;
         }
-        
+
         .control-group {
             margin-bottom: 15px;
         }
-        
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
             color: #4CAF50;
         }
-        
+
         select, input, button {
             width: 100%;
             padding: 10px;
@@ -57,13 +57,13 @@
             color: #fff;
             font-size: 16px;
         }
-        
+
         select:focus, input:focus, button:focus {
             outline: none;
             border-color: #4CAF50;
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
         }
-        
+
         .connect-btn {
             background: linear-gradient(45deg, #4CAF50, #45a049);
             border: none;
@@ -72,19 +72,19 @@
             font-weight: bold;
             text-transform: uppercase;
         }
-        
+
         .connect-btn:hover {
             background: linear-gradient(45deg, #45a049, #4CAF50);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
         }
-        
+
         .connect-btn:disabled {
             background: #666;
             cursor: not-allowed;
             transform: none;
         }
-        
+
         .status {
             text-align: center;
             padding: 10px;
@@ -92,19 +92,19 @@
             border-radius: 5px;
             font-weight: bold;
         }
-        
+
         .status.connected {
             background: rgba(76, 175, 80, 0.2);
             color: #4CAF50;
             border: 1px solid #4CAF50;
         }
-        
+
         .status.disconnected {
             background: rgba(244, 67, 54, 0.2);
             color: #f44336;
             border: 1px solid #f44336;
         }
-        
+
         .button-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -115,7 +115,7 @@
             border-radius: 10px;
             border: 2px solid #4CAF50;
         }
-        
+
         .midi-button {
             aspect-ratio: 1;
             border: 3px solid #555;
@@ -129,7 +129,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .midi-button::before {
             content: '';
             position: absolute;
@@ -140,11 +140,11 @@
             background: linear-gradient(135deg, transparent, rgba(255,255,255,0.1));
             transition: opacity 0.3s;
         }
-        
+
         .midi-button:hover::before {
             opacity: 0.8;
         }
-        
+
         .midi-button:active,
         .midi-button.active {
             background: linear-gradient(135deg, #4CAF50, #45a049);
@@ -152,21 +152,21 @@
             transform: scale(0.95);
             box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
         }
-        
+
         .midi-button:disabled {
             background: #333;
             color: #666;
             cursor: not-allowed;
             border-color: #444;
         }
-        
+
         .settings {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
-        
+
         .note-display {
             text-align: center;
             margin-top: 20px;
@@ -175,12 +175,12 @@
             border-radius: 10px;
             border: 2px solid #4CAF50;
         }
-        
+
         .note-display h3 {
             color: #4CAF50;
             margin-bottom: 10px;
         }
-        
+
         .note-info {
             font-size: 18px;
             color: #fff;
@@ -190,59 +190,54 @@
 <body>
     <div class="container">
         <h1>🎹 Controlador MIDI 4x4</h1>
-        
+
         <div class="midi-controls">
             <div class="control-group">
                 <label for="websocketUrl">Endereço do Servidor MIDI (Ex: ws://192.168.1.100:8080):</label>
-                <input type="text" id="websocketUrl" value="ws://localhost:8080" placeholder="ws://IP_DO_SEU_PC:PORTA">
+                <input type="text" id="websocketUrl" value="ws://192.168.137.1:8080" placeholder="ws://IP_DO_SEU_PC:PORTA">
             </div>
-
             <div class="settings">
                 <div class="control-group">
                     <label for="midiChannel">Canal MIDI (1-16):</label>
                     <input type="number" id="midiChannel" min="1" max="16" value="1">
                 </div>
-                
+
                 <div class="control-group">
                     <label for="baseNote">Nota Base:</label>
                     <input type="number" id="baseNote" min="0" max="127" value="60" title="C4 = 60">
                 </div>
-                
+
                 <div class="control-group">
                     <label for="velocity">Velocidade:</label>
                     <input type="number" id="velocity" min="1" max="127" value="100">
                 </div>
             </div>
-            
+
             <button id="connectBtn" class="connect-btn">Conectar ao Servidor MIDI</button>
-            
-            <div id="status" class="status disconnected">
-                Desconectado - Insira o endereço e clique em "Conectar"
-            </div>
+
+            <div id="status" class="status disconnected">Aguardando conexão...</div>
         </div>
-        
-        <div class="button-grid" id="buttonGrid">
-            </div>
-        
+
+        <div class="button-grid" id="buttonGrid"></div>
+
         <div class="note-display">
             <h3>Última Nota Enviada</h3>
             <div id="noteInfo" class="note-info">Nenhuma nota enviada ainda</div>
         </div>
     </div>
-
     <script>
         let ws = null; // Variável para a conexão WebSocket
         let activeButtons = new Set();
-        
+
         // Nomes das notas
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        
+
         function getNoteNameFromMIDI(midiNote) {
             const octave = Math.floor(midiNote / 12) - 1;
             const noteName = noteNames[midiNote % 12];
             return `${noteName}${octave}`;
         }
-        
+
         // Elementos DOM
         const connectBtn = document.getElementById('connectBtn');
         const websocketUrlInput = document.getElementById('websocketUrl'); // Novo input para URL
@@ -252,7 +247,7 @@
         const statusDiv = document.getElementById('status');
         const buttonGrid = document.getElementById('buttonGrid');
         const noteInfo = document.getElementById('noteInfo');
-        
+
         // Função para conectar ao servidor WebSocket
         function connectWebSocket() {
             const url = websocketUrlInput.value;
@@ -264,7 +259,7 @@
 
             statusDiv.textContent = 'Conectando ao servidor MIDI...';
             statusDiv.className = 'status disconnected';
-            connectBtn.disabled = true;
+            connectBtn.disabled = true; // Desabilita o botão enquanto tenta conectar
 
             ws = new WebSocket(url);
 
@@ -284,7 +279,7 @@
                 console.log('Desconectado do servidor WebSocket.');
                 statusDiv.textContent = 'Desconectado - Verifique o endereço e reconecte.';
                 statusDiv.className = 'status disconnected';
-                connectBtn.disabled = false;
+                connectBtn.disabled = false; // Ativa o botão para reconectar
                 disableButtons();
             };
 
@@ -292,7 +287,7 @@
                 console.error('Erro no WebSocket:', error);
                 statusDiv.textContent = 'Erro de conexão: Verifique o endereço e se o servidor está ativo.';
                 statusDiv.className = 'status disconnected';
-                connectBtn.disabled = false;
+                connectBtn.disabled = false; // Ativa o botão para tentar novamente
                 disableButtons();
             };
         }
@@ -310,11 +305,11 @@
                 button.disabled = true;
             });
         }
-        
+
         // Criar grid de botões
         function createButtonGrid() {
             buttonGrid.innerHTML = '';
-            
+
             for (let i = 0; i < 16; i++) {
                 const button = document.createElement('button');
                 button.className = 'midi-button';
@@ -326,64 +321,64 @@
                     e.preventDefault();
                     handleButtonPress(i);
                 });
-                
+
                 button.addEventListener('mouseup', (e) => {
                     e.preventDefault();
                     handleButtonRelease(i);
                 });
-                
+
                 button.addEventListener('mouseleave', (e) => {
                     e.preventDefault();
                     handleButtonRelease(i);
                 });
-                
+
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     handleButtonPress(i);
                 });
-                
+
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     handleButtonRelease(i);
                 });
-                
+
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     handleButtonRelease(i);
                 });
-                
+
                 buttonGrid.appendChild(button);
             }
         }
-        
+
         function handleButtonPress(buttonIndex) {
             if (!ws || ws.readyState !== WebSocket.OPEN || activeButtons.has(buttonIndex)) return;
-            
+
             activeButtons.add(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
             button.classList.add('active');
-            
+
             sendNoteOn(buttonIndex);
         }
-        
+
         function handleButtonRelease(buttonIndex) {
             if (!ws || ws.readyState !== WebSocket.OPEN || !activeButtons.has(buttonIndex)) return;
-            
+
             activeButtons.delete(buttonIndex);
             const button = buttonGrid.children[buttonIndex];
             button.classList.remove('active');
-            
+
             sendNoteOff(buttonIndex);
         }
-        
+
         function sendNoteOn(buttonIndex) {
             const baseNote = parseInt(baseNoteInput.value);
             const channel = parseInt(midiChannelInput.value) - 1; // MIDI channels are 0-15
             const velocity = parseInt(velocityInput.value);
             const note = baseNote + buttonIndex;
-            
+
             if (note > 127) return; // MIDI note limit
-            
+
             // Envia a mensagem MIDI como um objeto JSON via WebSocket
             const message = {
                 type: 'noteOn',
@@ -392,20 +387,20 @@
                 velocity: velocity
             };
             ws.send(JSON.stringify(message));
-            
+
             const noteName = getNoteNameFromMIDI(note);
             noteInfo.textContent = `Note ON: ${noteName} (${note}) - Velocity: ${velocity} - Canal: ${channel + 1}`;
-            
+
             console.log('Note ON (via WebSocket):', noteName, note, velocity, channel + 1);
         }
-        
+
         function sendNoteOff(buttonIndex) {
             const baseNote = parseInt(baseNoteInput.value);
             const channel = parseInt(midiChannelInput.value) - 1;
             const note = baseNote + buttonIndex;
-            
+
             if (note > 127) return;
-            
+
             // Envia a mensagem MIDI como um objeto JSON via WebSocket
             const message = {
                 type: 'noteOff',
@@ -413,18 +408,15 @@
                 note: note
             };
             ws.send(JSON.stringify(message));
-            
+
             const noteName = getNoteNameFromMIDI(note);
             noteInfo.textContent = `Note OFF: ${noteName} (${note}) - Canal: ${channel + 1}`;
-            
+
             console.log('Note OFF (via WebSocket):', noteName, note, channel + 1);
         }
-        
+
         // Event listeners
         connectBtn.addEventListener('click', connectWebSocket);
-        
-        // Remove os event listeners antigos relacionados à Web MIDI API
-        // midiOutputSelect.addEventListener('change', ...); // Esta parte não é mais necessária
 
         // Prevenir context menu nos botões
         document.addEventListener('contextmenu', (e) => {
@@ -432,19 +424,24 @@
                 e.preventDefault();
             }
         });
-        
+
         // Release all active notes when window loses focus
         window.addEventListener('blur', () => {
             for (let buttonIndex of activeButtons) {
                 handleButtonRelease(buttonIndex);
             }
         });
-        
+
         // Inicializar interface
         createButtonGrid();
-        
-        // Não precisamos mais verificar navigator.requestMIDIAccess
-        // A mensagem inicial de status é definida pelo HTML/CSS
+
+        // --- Alteração principal aqui ---
+        // Ativar o botão de conexão e definir o status inicial correto
+        connectBtn.disabled = false;
+        statusDiv.textContent = 'Aguardando conexão...';
+        statusDiv.className = 'status disconnected';
+        // --- Fim da alteração principal ---
+
     </script>
 </body>
 </html>
