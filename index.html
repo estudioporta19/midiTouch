@@ -287,6 +287,7 @@
             color: #999;
         }
 
+
         .settings {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -627,7 +628,10 @@
             const velocity = parseInt(velocityInput.value);
             const note = noteOverride !== null ? noteOverride : baseNote + buttonIndex;
 
-            if (note < 0 || note > 127) return; // MIDI note limit
+            if (isNaN(note) || note < 0 || note > 127) {
+                console.warn(`Tentativa de enviar nota MIDI inválida: ${note}`);
+                return;
+            }
 
             const message = {
                 type: 'noteOn',
@@ -647,7 +651,10 @@
             const channel = parseInt(midiChannelInput.value) - 1;
             const note = noteOverride !== null ? noteOverride : baseNote + buttonIndex;
 
-            if (note < 0 || note > 127) return;
+            if (isNaN(note) || note < 0 || note > 127) {
+                 console.warn(`Tentativa de enviar nota MIDI inválida (OFF): ${note}`);
+                return;
+            }
 
             const message = {
                 type: 'noteOff',
@@ -679,10 +686,14 @@
                 slider.max = '127';
                 slider.value = '0'; // Valor inicial
                 slider.disabled = true; // Desabilitado por padrão
+
+                // Event listener para o evento 'input' (dispara continuamente enquanto arrasta)
                 slider.addEventListener('input', (e) => {
                     const currentCCNumber = parseInt(ccStartInput.value) + parseInt(ccControl.dataset.index);
-                    sendControlChange(currentCCNumber, parseInt(e.target.value));
-                    ccValueDisplay.textContent = e.target.value;
+                    const value = parseInt(e.target.value);
+                    sendControlChange(currentCCNumber, value);
+                    // Atualiza o valor exibido imediatamente
+                    ccControl.querySelector('.cc-value').textContent = value;
                 });
                 ccControl.appendChild(slider);
 
@@ -702,7 +713,8 @@
             ccControls.forEach(control => {
                 const index = parseInt(control.dataset.index);
                 const ccNumber = ccStart + index;
-                control.querySelector('label').textContent = `CC ${ccNumber}`;
+                // Garante que o CC não ultrapasse 127
+                control.querySelector('label').textContent = `CC ${Math.min(ccNumber, 127)}`;
             });
         }
 
@@ -751,7 +763,6 @@
                         if (isNaN(val) || val < 0) val = 0;
                         if (val > 127) val = 127;
                         e.target.value = val; // Corrigir valor inválido
-                        // Não envia CC aqui, apenas atualiza o número exibido
                         hybridControl.querySelector('label').textContent = `CC ${val}`;
                     });
 
@@ -759,6 +770,11 @@
                     slider.addEventListener('input', (e) => {
                         const ccNumber = parseInt(ccInput.value);
                         const value = parseInt(e.target.value);
+                        // Verifica se o CC number é válido antes de enviar
+                        if (isNaN(ccNumber) || ccNumber < 0 || ccNumber > 127) {
+                             console.warn(`Tentativa de enviar CC inválido na aba híbrida: ${ccNumber}`);
+                             return;
+                        }
                         sendControlChange(ccNumber, value); // Reutiliza a função de CC
                         valueDisplay.textContent = value;
                     });
@@ -819,6 +835,7 @@
             const controls = hybridGrid.querySelectorAll('.hybrid-control');
             controls.forEach(control => {
                 control.classList.remove('disabled');
+                // Ativa todos os inputs e botões dentro do controle híbrido
                 control.querySelectorAll('input, button').forEach(el => el.disabled = false);
             });
         }
@@ -827,8 +844,41 @@
             const controls = hybridGrid.querySelectorAll('.hybrid-control');
             controls.forEach(control => {
                 control.classList.add('disabled');
+                // Desativa todos os inputs e botões dentro do controle híbrido
                 control.querySelectorAll('input, button').forEach(el => el.disabled = true);
             });
+        }
+
+        // --- Funções de Envio de Mensagens MIDI ---
+        function sendControlChange(ccNumber, value) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const channel = parseInt(midiChannelInput.value) - 1;
+
+            // Validações para garantir que os valores MIDI são válidos
+            if (isNaN(channel) || channel < 0 || channel > 15) {
+                console.warn(`Canal MIDI inválido: ${channel + 1}`);
+                return;
+            }
+            if (isNaN(ccNumber) || ccNumber < 0 || ccNumber > 127) {
+                console.warn(`Número de controlador CC inválido: ${ccNumber}`);
+                return;
+            }
+            if (isNaN(value) || value < 0 || value > 127) {
+                console.warn(`Valor de CC inválido: ${value}`);
+                return;
+            }
+
+            const message = {
+                type: 'controlChange',
+                channel: channel,
+                controller: ccNumber,
+                value: value
+            };
+            ws.send(JSON.stringify(message));
+
+            lastMessageInfo.textContent = `CC: ${ccNumber} - Valor: ${value} - Canal: ${channel + 1}`;
+            console.log('Control Change (via WebSocket):', ccNumber, value, channel + 1);
         }
 
 
@@ -848,15 +898,13 @@
 
             currentActiveTab = tabName; // Atualiza a aba ativa
 
-            // Gerir visibilidade dos campos de configuração
+            // Gerir visibilidade dos campos de configuração globais
             baseNoteControlGroup.style.display = 'none';
             velocityControlGroup.style.display = 'none';
             ccStartControlGroup.style.display = 'none';
 
             // Desabilitar todos os controles de todas as abas por segurança
-            disableButtons();
-            disableCcSliders();
-            disableHybridControls();
+            disableAllControls(); // Garante que tudo começa desabilitado
 
             // Ativar os controles da aba atual APENAS se estiver conectado
             if (tabName === 'notes') {
@@ -871,7 +919,7 @@
                     enableCcSliders();
                 }
             } else if (tabName === 'hybrid') {
-                // Para a aba híbrida, os campos de nota base/velocidade não são usados
+                // Para a aba híbrida, os campos de nota base/velocidade e CC inicial não são usados
                 // O canal MIDI ainda é global
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     enableHybridControls();
@@ -925,6 +973,7 @@
         createHybridGrid();  // Cria os controles híbridos da terceira aba
 
         // Define o estado inicial da UI
+        // Estas linhas foram movidas para *antes* de openTab('notes')
         connectBtn.disabled = false;
         statusDiv.textContent = 'Aguardando conexão...';
         statusDiv.className = 'status disconnected';
